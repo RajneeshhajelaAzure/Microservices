@@ -1,0 +1,103 @@
+Dynamic Role Script
+-- Create Roles Table
+CREATE TABLE Roles (
+    RoleId INT IDENTITY PRIMARY KEY,
+    RoleName NVARCHAR(100) NOT NULL UNIQUE,
+    Description NVARCHAR(255) NULL
+);
+
+-- Create Permissions Table
+CREATE TABLE Permissions (
+    PermissionId INT IDENTITY PRIMARY KEY,
+    PermissionName NVARCHAR(100) NOT NULL UNIQUE,
+    Description NVARCHAR(255) NULL
+);
+
+-- Create RolePermissions Table
+CREATE TABLE RolePermissions (
+    RolePermissionId INT IDENTITY PRIMARY KEY,
+    RoleId INT NOT NULL FOREIGN KEY REFERENCES Roles(RoleId) ON DELETE CASCADE,
+    PermissionId INT NOT NULL FOREIGN KEY REFERENCES Permissions(PermissionId) ON DELETE CASCADE,
+    UNIQUE(RoleId, PermissionId) -- Ensures no duplicate Role-Permission pairs
+);
+
+-- Create Users Table
+CREATE TABLE Users (
+    UserId INT IDENTITY PRIMARY KEY,
+    UserName NVARCHAR(100) NOT NULL UNIQUE,
+    PasswordHash NVARCHAR(MAX) NOT NULL,
+    Email NVARCHAR(255) NOT NULL UNIQUE
+);
+
+-- Create UserRoles Table
+CREATE TABLE UserRoles (
+    UserRoleId INT IDENTITY PRIMARY KEY,
+    UserId INT NOT NULL FOREIGN KEY REFERENCES Users(UserId) ON DELETE CASCADE,
+    RoleId INT NOT NULL FOREIGN KEY REFERENCES Roles(RoleId) ON DELETE CASCADE,
+    UNIQUE(UserId, RoleId) -- Ensures no duplicate User-Role pairs
+);
+
+-- Insert Sample Data into Roles
+INSERT INTO Roles (RoleName, Description)
+VALUES
+('Role1', 'Can create only'),
+('Role2', 'Can create and update'),
+('Role3', 'Can read, create, and update');
+
+-- Insert Sample Data into Permissions
+INSERT INTO Permissions (PermissionName, Description)
+VALUES
+('Create', 'Can create resources'),
+('Update', 'Can update resources'),
+('Read', 'Can read resources');
+
+-- Insert Sample Data into RolePermissions
+INSERT INTO RolePermissions (RoleId, PermissionId)
+VALUES
+(1, 1), -- Role1 -> Create
+(2, 1), -- Role2 -> Create
+(2, 2), -- Role2 -> Update
+(3, 1), -- Role3 -> Create
+(3, 2), -- Role3 -> Update
+(3, 3); -- Role3 -> Read
+
+-- Insert Sample Data into Users
+INSERT INTO Users (UserName, PasswordHash, Email)
+VALUES
+('admin', HASHBYTES('SHA2_256', 'AdminPassword'), 'admin@example.com'),
+('user1', HASHBYTES('SHA2_256', 'User1Password'), 'user1@example.com'),
+('user2', HASHBYTES('SHA2_256', 'User2Password'), 'user2@example.com');
+
+-- Insert Sample Data into UserRoles
+INSERT INTO UserRoles (UserId, RoleId)
+VALUES
+(1, 3), -- Admin -> Role3 (Full Access)
+(2, 1), -- User1 -> Role1 (Create Only)
+(3, 2); -- User2 -> Role2 (Create and Update)
+
+
+SELECT DISTINCT p.PermissionName
+FROM Users u
+JOIN UserRoles ur ON u.UserId = ur.UserId
+JOIN RolePermissions rp ON ur.RoleId = rp.RoleId
+JOIN Permissions p ON rp.PermissionId = p.PermissionId
+WHERE u.UserName = 'user1';
+
+Dynamic Query to Check Role and Permission
+
+DECLARE @UserName NVARCHAR(100) = 'user1';
+DECLARE @Permission NVARCHAR(100) = 'Create';
+
+SELECT CASE 
+    WHEN EXISTS (
+        SELECT 1
+        FROM Users u
+        JOIN UserRoles ur ON u.UserId = ur.UserId
+        JOIN RolePermissions rp ON ur.RoleId = rp.RoleId
+        JOIN Permissions p ON rp.PermissionId = p.PermissionId
+        WHERE u.UserName = @UserName AND p.PermissionName = @Permission
+    ) THEN 'Allowed'
+    ELSE 'Denied'
+END AS PermissionStatus;
+
+
